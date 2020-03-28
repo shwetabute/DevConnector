@@ -1,12 +1,13 @@
  const express = require('express');
- const user = require('../../models/User');
+ const User = require('../../models/User');
  const gravatar = require('gravatar');
  const bcrypt = require('bcryptjs'); 
  const jwt = require('jsonwebtoken');
  const keys = require('../../config/keys');
  const passport = require('passport');
  const router = express.Router();
- 
+ const validateRegisterInput = require('../../Validation/register');
+ const validateLoginInput = require('../../Validation/login');
 
 //  router.get('/test', (req,res) => res.json({msg: 'user Works!'}));
 
@@ -15,7 +16,12 @@
 // @access Public
 
 router.post('/register', (req, res) => {
-  user.findOne({email: req.body.email})
+  const {errors,isValid} = validateRegisterInput(req.body)
+  if(!isValid) {
+    return res.status(400).json(errors);
+  }
+
+  User.findOne({email: req.body.email})
     .then(user => {
       if (user){
         return res.status(400).json({email: 'Email already exists!'})
@@ -53,6 +59,12 @@ router.post('/register', (req, res) => {
 // @desc login user
 // @access Public
 router.post('/login', (req,res)=> {
+
+  const {errors,isValid} = validateLoginInput(req.body)
+  if(!isValid) {
+    return res.status(400).json(errors);
+  }
+
   User.findOne({email: req.body.email})
   .then(user=> {
     if (!user){
@@ -62,15 +74,14 @@ router.post('/login', (req,res)=> {
       bcrypt.compare(req.body.password,user.password)
       .then(isMatch => {
         if (isMatch){
+          // User matched now we need a Token
+          //payload
+          const payload = {
+            id: user.id, 
+            name: user.name, 
+            avatar: user.avatar};
 
-// return res.json({msg: 'Success!'})
-
-  // User matched now we need a Token
-  //payload
-  const payload = {id: user.id, name: user.name, avatar: user.avatar};
-
-  //sign a Token or create a Token
-
+          //sign a Token or create a Token
           jwt.sign(payload, keys.secretOrKey, 
             {expiresIn: 3600}, (err, token) => {
               res.json({
